@@ -1,0 +1,110 @@
+version: "3.3"
+
+volumes:
+    shared-workspace:
+    hadoop_datanode1:
+    hadoop_datanode2:
+    hadoop_datanode3:
+    hadoop_namenode:
+    hadoop_historyserver:
+networks:
+    spark-net:
+        driver: bridge
+
+services:
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    networks:
+      - "spark-net"
+    ports:
+      - 80:9870
+      - 9000:9000
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+      - ./data:/home/nbs
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hadoop.env
+
+  resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: resourcemanager
+    depends_on:
+      - namenode
+      - datanode1
+      - datanode2
+    networks:
+      - "spark-net"
+    ports:
+      - 8089:8088
+    env_file:
+      - ./hadoop.env
+
+  historyserver:
+    image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
+    container_name: historyserver
+    depends_on:
+      - namenode
+      - datanode1
+      - datanode2
+    networks:
+      - "spark-net"
+    volumes:
+      - hadoop_historyserver:/hadoop/yarn/timeline
+    env_file:
+      - ./hadoop.env
+
+  nodemanager1:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    depends_on:
+      - namenode
+      - datanode1
+      - datanode2
+    networks:
+      - "spark-net"
+    env_file:
+      - ./hadoop.env
+
+  datanode1:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode1
+    depends_on:
+      - namenode
+    networks:
+        - "spark-net"
+    volumes:
+      - hadoop_datanode1:/hadoop/dfs/data
+    env_file:
+      - ./hadoop.env
+
+  datanode2:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode2
+    depends_on:
+      - namenode
+    networks:
+        - "spark-net"
+    volumes:
+      - hadoop_datanode2:/hadoop/dfs/data
+    env_file:
+      - ./hadoop.env
+
+  
+  jupyter-notebook:
+    container_name: jupyternb
+    image: jupyter/all-spark-notebook:latest
+    expose:
+        - "8888"
+        - "4040"
+    networks:
+        - "spark-net"
+    user: root
+    ports:
+        - "8888:8888"
+    volumes:
+        - ./data:/home/jovyan/work/nbs
+        - ./events:/tmp/spark-events
+    command: bash -c "pip install gdown faiss-cpu && !pip install opencv-python; start-notebook.sh --ip=0.0.0.0 --allow-root --NotebookApp.token=''" 
